@@ -229,6 +229,7 @@ class TouchWindow(TouchBaseWidget):
         self.centralWidget = QWidget()
         self.layout.addWidget(self.centralWidget)
         self.setLayout(self.layout)
+        self.setStyleSheet("QWidget:focus {  background-color: blue; }")
 
     def setCentralWidget(self, w):
         # remove the old central widget and add a new one
@@ -800,3 +801,5 @@ class TouchApplication(QApplication):
             self.setAutoSipEnabled(True)
             self.setInputContext(TouchInputContext(self))
         TouchSetStyle(self)
+
+

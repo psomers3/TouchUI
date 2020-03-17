@@ -8,6 +8,8 @@
 import configparser
 import sys, os, subprocess, threading
 import socketserver, select, time
+from xbox360controller import Xbox360Controller
+import pyautogui
 
 from TouchStyle import *
 from PyQt4.QtCore import *
@@ -147,7 +149,8 @@ class ConfirmationDialog(PlainDialog):
 
 # The TXTs window title bar
 class CategoryWidget(QComboBox):
-    def __init__(self,categories, parent = None):
+    selection_out_of_range = pyqtSignal(str)
+    def __init__(self, categories, parent = None):
         QComboBox.__init__(self, parent)
         self.setObjectName("titlebar")
         self.setCategories(categories)
@@ -267,11 +270,12 @@ class StatusBar(QWidget):
 
     def update(self):
         self.repaint()
-       
+
+
 # The TXT/RPi does not use windows. Instead we just paint custom 
 # toplevel windows fullscreen
 class TouchTopWidget(QWidget):
-    def __init__(self,parent,categories):
+    def __init__(self, parent, categories):
         QWidget.__init__(self)
         # the setFixedSize is only needed for testing on a desktop pc
         # the centralwidget name makes sure the themes background 
@@ -296,7 +300,7 @@ class TouchTopWidget(QWidget):
         self.main_widget = QWidget()
         self.layout = QVBoxLayout()
         self.layout.setSpacing(0)
-        self.layout.setContentsMargins(0,0,0,0)
+        self.layout.setContentsMargins(0, 0, 0, 0)
 
         self.category_w = CategoryWidget(categories, self.main_widget)
         self.category_w.activated[str].connect(parent.set_category)
@@ -310,7 +314,7 @@ class TouchTopWidget(QWidget):
     def setCategories(self, categories):
         return self.category_w.setCategories(categories)
         
-    def addWidget(self,w):
+    def addWidget(self, w):
         self.layout.addWidget(w)
 
         # TXT windows are always fullscreen
@@ -458,26 +462,79 @@ class AppButton(QToolButton):
         self.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
         self.setObjectName("launcher-icon")
 
+        self.selected_style_sheet = "QToolButton { " \
+                                    "background-color: blue;" \
+                                    "color: red }"
+
         # hide shadow while icon is pressed
     def mousePressEvent(self, event):
         self.graphicsEffect().setEnabled(False)
-        QToolButton.mousePressEvent(self,event)
+        self.setStyleSheet(self.selected_style_sheet)
+        QToolButton.mousePressEvent(self, event)
 
     def mouseReleaseEvent(self, event):
         self.graphicsEffect().setEnabled(True)
-        QToolButton.mouseReleaseEvent(self,event)
+        self.setStyleSheet('')
+        QToolButton.mouseReleaseEvent(self, event)
 
         # the main icon grid
 class IconGrid(QStackedWidget):
+    above_grid_requested = pyqtSignal()
+
     def __init__(self, apps, cat):
         QStackedWidget.__init__(self)
 
         self.apps = apps
+        self.buttons = []  # should be items of (page, row, column, button object)
         self.current_apps = self.filterCategory(self.apps, cat)
 
         # event to know the final size when creating
         # the icon grid
         self.installEventFilter(self)
+        self.selected_style = 'QToolButton {' \
+                              'background-color: blue;' \
+                              'color: red }'
+        self.current_icon = None
+
+    def change_selected_app(self, direction):
+        if self.current_icon is None:
+            self.current_icon = self.buttons[0]
+            self.current_icon[-1].setStyleSheet(self.selected_style)
+            return
+
+        curr_page = self.currentIndex()
+        curr_row = self.current_icon[1]
+        curr_col = self.current_icon[2]
+        new_col = curr_col
+        new_row = curr_row
+        if direction == 'right':
+            new_col += 1
+        elif direction == 'left':
+            new_col -= 1
+
+        if direction == 'down':
+            new_row += 1
+        if direction == 'up':
+            new_row -= 1
+
+        if new_col >= self.columns:
+            new_col = 0
+        elif new_col < 0:
+            new_col = self.columns - 1
+
+        if new_row >= self.rows:
+            new_row = 0
+        elif new_row < 0:
+            self.above_grid_requested.emit()
+            self.current_icon[-1].setStyleSheet('')
+            self.current_icon = None
+
+        for button in self.buttons:
+            if button[0] == curr_page and button[1] == new_row and button[2] == new_col:
+                self.current_icon[-1].setStyleSheet('')
+                self.current_icon = button
+                self.current_icon[-1].setStyleSheet(self.selected_style)
+                break
 
     def eventFilter(self, obj, event):
         if event.type() == event.Resize:
@@ -489,6 +546,8 @@ class IconGrid(QStackedWidget):
         return False
 
     def createPages(self):
+        self.buttons.clear()
+
         # remove all pages that might already be there
         while self.count():
             w = self.widget(self.count()-1)
@@ -515,6 +574,7 @@ class IconGrid(QStackedWidget):
                 if self.count():
                     but = self.createIcon(os.path.join(BASE, "prev.png"), self.do_prev)
                     grid.addWidget(but, 0, 0, Qt.AlignCenter)
+                    self.buttons.append((self.count(), 0, 0, but))
                     index = 1
 
             # get app details
@@ -532,7 +592,10 @@ class IconGrid(QStackedWidget):
 
             # create a launch button for this app
             but = self.createIcon(iconname, self.do_launch, app['name'], executable)
-            grid.addWidget(but, index/self.columns, index%self.columns, Qt.AlignCenter)
+            row = int(index/self.columns)
+            column = index % self.columns
+            grid.addWidget(but, row, column, Qt.AlignCenter)
+            self.buttons.append((self.count(), row, column, but))
 
             # check if this is the second last icon on page
             # and if there are at least two more icons to be added. Then we need a
@@ -541,7 +604,10 @@ class IconGrid(QStackedWidget):
                 if self.current_apps.index(app) < len(self.current_apps)-2:
                     index = icons_per_page - 1
                     but = self.createIcon(os.path.join(BASE, "next.png"), self.do_next)
-                    grid.addWidget(but, index/self.columns, index%self.columns, Qt.AlignCenter)
+                    row = int(index / self.columns)
+                    column = index % self.columns
+                    grid.addWidget(but, row, column, Qt.AlignCenter)
+                    self.buttons.append((self.count(), row, column, but))
 
             # advance position counters
             index += 1
@@ -555,6 +621,9 @@ class IconGrid(QStackedWidget):
             empty = self.createIcon()
             grid.addWidget(empty, index/self.columns, index%self.columns, Qt.AlignCenter)
             index += 1
+
+        self.current_icon = self.buttons[0]
+        self.current_icon[-1].setStyleSheet(self.selected_style)
 
     # handler of the "next" button
     def do_next(self):
@@ -671,7 +740,48 @@ class TcpServer(QTcpServer):
 
     def socketError(self):
         pass
-        
+
+
+class XBoxInput(QObject):
+    button_pressed = pyqtSignal(str)
+
+    directions = {(-1, 0): 'left',
+                  (1, 0): 'right',
+                  (0, -1): 'down',
+                  (0, 1): 'up',
+                  (0, 0): 'nothing',
+                  (1, 1): 'nothing',
+                  (-1, -1): 'nothing',
+                  (-1, 1): 'nothing',
+                  (1, -1): 'nothing'}
+
+    def __init__(self):
+        QObject.__init__(self)
+        try:
+            self.xbox_controller = self._connect_controller()
+        except:
+            self.xbox_controller = None
+
+    def _connect_controller(self):
+        try:
+            xbox_controller = Xbox360Controller(index=1, axis_threshold=0.05)
+        except Exception as e:  # this library emits a stupid general exception that makes it difficult to retry
+            try:
+                xbox_controller = Xbox360Controller(index=2, axis_threshold=0.05)
+            except Exception as e:
+                xbox_controller = Xbox360Controller(index=0, axis_threshold=0.05)
+
+        xbox_controller.hat.when_moved = self._d_pad
+        xbox_controller.button_start.when_pressed = self._start
+        return xbox_controller
+
+    def _d_pad(self, axis):
+        direction = (axis.x, axis.y)
+        self.button_pressed.emit(self.directions[direction])
+
+    def _start(self, button):
+        self.button_pressed.emit('start')
+
 
 class FtcGuiApplication(TouchApplication):
     def __init__(self, args):
@@ -695,7 +805,59 @@ class FtcGuiApplication(TouchApplication):
         self.tcpServer.stop_app.connect(self.on_stop_app)
 
         self.addWidgets()
-        self.exec_()        
+        self.xbox_controller = XBoxInput()
+        self.current_xbox_focus = self.icons
+        self.xbox_controller.button_pressed.connect(self.handle_xbox_button)
+        self.icons.above_grid_requested.connect(lambda: self.switch_focus('categories'))
+        self.aboutToQuit.connect(self.xbox_controller.xbox_controller.close)
+        self.exec_()
+
+    def switch_focus(self, focus):
+        if focus == 'categories':
+            self.current_xbox_focus = self.w.category_w
+            mouse_pos = self.w.category_w.pos()
+            click = QMouseEvent(QEvent.MouseButtonPress, mouse_pos, Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
+            self.w.category_w.mousePressEvent(click)
+
+    def handle_xbox_button(self, button):
+        if not self.app_is_running():
+            if self.current_xbox_focus == self.icons:
+                self.icons.change_selected_app(button)
+                if button == 'start':
+                    self.icons.current_icon[-1].click()
+            elif self.current_xbox_focus == self.w.category_w:
+                if button in ['left', 'right']:
+                    self.current_xbox_focus = self.icons
+                    self.icons.change_selected_app('down')
+                    pyautogui.press('esc')
+                elif button == 'down':
+                    pyautogui.press('down')
+                elif button == 'up':
+                    pyautogui.press('up')
+                elif button == 'start':
+                    pyautogui.press('enter')
+                    self.current_xbox_focus = self.icons
+
+        else:
+            if button == 'right':
+                if self.xbox_controller.xbox_controller.button_select.is_pressed:
+                    pyautogui.press('right')
+                else:
+                    pyautogui.press('tab')
+            elif button == 'up':
+                pyautogui.press('up')
+            elif button == 'left':
+                if self.xbox_controller.xbox_controller.button_select.is_pressed:
+                    pyautogui.press('left')
+                else:
+                    pyautogui.hotkey('shift', 'tab')
+            elif button == 'down':
+                pyautogui.press('down')
+            elif button == 'start':
+                if self.xbox_controller.xbox_controller.button_select.is_pressed:
+                    pyautogui.press('enter')
+                else:
+                    pyautogui.press('space')
 
     def app_is_running(self):
         if self.app_process == None:
@@ -790,6 +952,7 @@ class FtcGuiApplication(TouchApplication):
 
     @pyqtSlot()
     def on_stop_app(self):
+        print('stopped')
         if self.app_is_running():
             self.app_process.kill()
             while self.app_process.poll() == None:
@@ -798,6 +961,8 @@ class FtcGuiApplication(TouchApplication):
             # give app a second to terminate
             # fix for https://github.com/ftCommunity/ftcommunity-TXT/issues/50
             time.sleep(1)
+
+        self.reset_xbox_selector()
 
     # read a number of entries from the manifest and return them 
     # as a dictionary
@@ -899,9 +1064,9 @@ class FtcGuiApplication(TouchApplication):
         self.icons = IconGrid(self.apps, self.current_category)
         self.icons.launch.connect(self.on_launch)
 
-        self.w.addWidget(self.icons);
-        self.w.show() 
- 
+        self.w.addWidget(self.icons)
+        self.w.show()
+
 # Only actually do something if this script is run standalone, so we can test our 
 # application, but we're also able to import this program without actually running
 # any code.
