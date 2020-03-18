@@ -54,6 +54,11 @@ INPUT_EVENT_SIZE = struct.calcsize(INPUT_EVENT_FORMAT)
 
 STYLE_NAME = "themes/default/style.qss"
 
+
+app = QApplication([])
+screen_resolution = app.desktop().screenGeometry()
+width, height = screen_resolution.width(), screen_resolution.height()
+
 # window size used on PC
 if 'SCREEN' in os.environ:
     (w, h) = os.environ.get('SCREEN').split('x')
@@ -61,11 +66,11 @@ if 'SCREEN' in os.environ:
     WIN_HEIGHT = int(h)
 else:
     if DEV_ORIENTATION == "LANDSCAPE":
-        WIN_WIDTH = 320
-        WIN_HEIGHT = 240
+        WIN_WIDTH = height
+        WIN_HEIGHT = width
     else:
-        WIN_WIDTH = 240
-        WIN_HEIGHT = 320
+        WIN_WIDTH = width
+        WIN_HEIGHT = height
 
 
 

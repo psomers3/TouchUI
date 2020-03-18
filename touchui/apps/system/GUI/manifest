@@ -1,0 +1,9 @@
+[app]
+name: GUI
+category: System
+author: Peter Somers &tl;psomers3@gatech.edu&gt;
+icon: icon.png
+desc: Launch normal GUI
+exec: GUI.py
+managed: no
+uuid:

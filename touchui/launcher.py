@@ -29,14 +29,19 @@ BUSY_TIMEOUT = 20
 # make sure all file access happens relative to this script
 BASE = os.path.dirname(os.path.realpath(__file__))
 
+app = QApplication([])
+screen_resolution = app.desktop().screenGeometry()
+width, height = screen_resolution.width(), screen_resolution.height()
+
+
 # window size used on PC
 if 'SCREEN' in os.environ:
     (w, h) = os.environ.get('SCREEN').split('x')
     WIN_WIDTH = int(w)
     WIN_HEIGHT = int(h)
 else:
-    WIN_WIDTH = 240
-    WIN_HEIGHT = 320
+    WIN_WIDTH = width
+    WIN_HEIGHT = height
 
 # a simple dialog without any decorations (and this without
 # the user being able to get rid of it by himself)
@@ -711,6 +716,7 @@ class TcpServer(QTcpServer):
         for s in self.connections:
             if s.canReadLine():
                 line = str(s.readLine(), "utf-8").strip()
+                print(line)
                 if len(line) > 0:
                     cmd = line.split()[0]
                     parm = line[len(cmd):].strip()
