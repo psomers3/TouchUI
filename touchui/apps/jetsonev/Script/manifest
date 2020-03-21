@@ -1,0 +1,9 @@
+[app]
+name: Script
+category: System
+author: Peter Somers &tl;psomers3@gatech.edu&gt;
+icon: python.png
+desc: Launch normal GUI
+exec: Script.py
+managed: no
+uuid:

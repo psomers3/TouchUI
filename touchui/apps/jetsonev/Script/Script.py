@@ -1,0 +1,117 @@
+#! /usr/bin/env python3
+# -*- coding: utf-8 -*-
+#
+import sys
+from TouchStyle import *
+from PyQt4.Qt import QGridLayout
+from CommonButtons import ShadowButton
+
+
+class FtcGuiApplication(TouchApplication):
+    def __init__(self, args):
+        TouchApplication.__init__(self, args)
+        self.script_directory = '/home/isys/git/JetsonEV-scripts'
+
+        # create the empty main window
+        self.w = TouchWindow("Run Python Script")
+
+        self.relative_path = os.path.dirname(os.path.realpath(__file__))
+        self.grid = QGridLayout()
+        environment = QProcessEnvironment()
+        environment.insert('PYTHONPATH', self.script_directory)
+        self.process = QProcess()
+        self.process.setProcessEnvironment(environment)
+        self.process.readyReadStandardOutput.connect(self.stdoutReady)
+        self.process.readyReadStandardError.connect(self.stderrReady)
+
+        self.play_btn = ShadowButton(os.path.join(self.relative_path, 'start'))
+        self.play_btn.setText("Start")
+        self.play_btn.clicked.connect(self.start_script)
+        self.grid.addWidget(self.play_btn, 0, 0, 1, 1)
+
+        self.script_selector = QComboBox()
+        self.scan_scripts()
+        self.grid.addWidget(self.script_selector, 0, 1, 1, 3)
+        self.grid.setColumnStretch(1, 1.5)
+
+        self.grid.setAlignment(Qt.AlignCenter)
+
+        self.stop_btn = ShadowButton(os.path.join(self.relative_path, 'stop'))
+        self.stop_btn.setText("Stop")
+        self.stop_btn.clicked.connect(self.stop_script)
+        self.grid.addWidget(self.stop_btn, 0, 4, 1, 1)
+        self.grid.setRowStretch(1, 4)
+
+        self.console_output = QPlainTextEdit()
+        self.console_output.setReadOnly(True)
+        console_style = "QPlainTextEdit {" \
+                        "background-color: black;" \
+                        "color: white;" \
+                        "}"
+        self.console_output.setFocusPolicy(Qt.NoFocus)
+        self.console_output.setFrameStyle(3)
+        self.console_output.setStyleSheet(console_style)
+
+        self.grid.addWidget(self.console_output, 1, 0, 1, 5)
+
+        self.w.centralWidget.setLayout(self.grid)
+        self.w.centralWidget.keyReleaseEvent = lambda event: self.filter_out_arrow_release_keys(self.w.centralWidget, event)
+        self.w.centralWidget.keyPressEvent = lambda event: self.filter_out_arrow_press_keys(self.w.centralWidget, event)
+        self.w.keyPressEvent = lambda event: self.filter_out_arrow_press_keys(self.w, event)
+        self.w.keyReleaseEvent = lambda event: self.filter_out_arrow_release_keys(self.w, event)
+
+        self.play_btn.keyReleaseEvent = lambda event: self.filter_out_arrow_release_keys(self.play_btn, event)
+        self.play_btn.keyPressEvent = lambda event: self.filter_out_arrow_press_keys(self.play_btn, event)
+        self.stop_btn.keyReleaseEvent = lambda event: self.filter_out_arrow_release_keys(self.stop_btn, event)
+        self.stop_btn.keyPressEvent = lambda event: self.filter_out_arrow_press_keys(self.stop_btn, event)
+
+        self.w.show()
+        self.exec_()
+
+    def scan_scripts(self):
+        self.script_selector.clear()
+
+        for script in os.listdir(self.script_directory):
+            if os.path.isfile(os.path.join(self.script_directory, script)):
+                if script[-3:] == '.py':
+                    self.script_selector.addItem(script[:-3])
+
+    def start_script(self):
+        flags = ['-u', os.path.join(self.script_directory, self.script_selector.currentText() + '.py')]
+        self.process.start('python3', flags)
+
+    def stop_script(self):
+        self.process.terminate()
+
+    def fwd_output(self, text):
+        self.console_output.appendPlainText(text)
+        cursor = self.console_output.textCursor()
+        cursor.movePosition(cursor.End)
+
+    def stdoutReady(self):
+        text = str(self.process.readAllStandardOutput(), encoding='utf8')
+        self.fwd_output(text)
+
+    def stderrReady(self):
+        text = str(self.process.readAllStandardError(), encoding='utf8')
+        self.fwd_output(text)
+
+    def filter_out_arrow_release_keys(self, widget, event):
+        if event.key() == Qt.Key_Up:
+            self.console_output.verticalScrollBar().triggerAction(QAbstractSlider.SliderSingleStepSub)
+        elif event.key() == Qt.Key_Down:
+            self.console_output.verticalScrollBar().triggerAction(QAbstractSlider.SliderSingleStepAdd)
+        else:
+            type(widget).keyReleaseEvent(widget, event)
+
+    def filter_out_arrow_press_keys(self, widget, event):
+        if event.key() == Qt.Key_Up:
+            self.console_output.verticalScrollBar().triggerAction(QAbstractSlider.SliderSingleStepSub)
+        elif event.key() == Qt.Key_Down:
+            self.console_output.verticalScrollBar().triggerAction(QAbstractSlider.SliderSingleStepAdd)
+        else:
+            type(widget).keyPressEvent(widget, event)
+
+
+if __name__ == "__main__":
+    FtcGuiApplication(sys.argv)

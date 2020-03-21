@@ -11,6 +11,10 @@ import socketserver, select, time
 from xbox360controller import Xbox360Controller
 import pyautogui
 
+# make sure all file access happens relative to this script
+# BASE = os.path.dirname(os.path.realpath(__file__))
+BASE = '/home/isys/git/TouchUI/touchui'
+
 from TouchStyle import *
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
@@ -25,9 +29,6 @@ THEME = "default"
 
 CTRL_PORT = 9000
 BUSY_TIMEOUT = 20
-
-# make sure all file access happens relative to this script
-BASE = os.path.dirname(os.path.realpath(__file__))
 
 app = QApplication([])
 screen_resolution = app.desktop().screenGeometry()
@@ -77,11 +78,12 @@ class MessageDialog(PlainDialog):
         self.layout.addStretch()
         self.setLayout(self.layout)        
 
+
 # A fullscreen confirmation dialog. This can be called by an external
 # application via the built-in tcp server to e.g. get some user
 # feedback.
 class ConfirmationDialog(PlainDialog):
-    def __init__(self,sock,str):
+    def __init__(self, sock, str):
         self.sock = sock
 
         strings = str.split("\\n")
@@ -152,6 +154,7 @@ class ConfirmationDialog(PlainDialog):
     def on_close_timer(self):
         self.close()         # close dialog
 
+
 # The TXTs window title bar
 class CategoryWidget(QComboBox):
     selection_out_of_range = pyqtSignal(str)
@@ -184,6 +187,7 @@ class CategoryWidget(QComboBox):
 
 # the status bar at the screens top
 PLUGINS_DIR = "plugins"
+
 
 class StatusPopup(QFrame):
     def __init__(self, plugins, bar, parent=None):
@@ -816,6 +820,8 @@ class FtcGuiApplication(TouchApplication):
         self.xbox_controller.button_pressed.connect(self.handle_xbox_button)
         self.icons.above_grid_requested.connect(lambda: self.switch_focus('categories'))
         self.aboutToQuit.connect(self.xbox_controller.xbox_controller.close)
+        self.w.keyReleaseEvent = self.key_press_event
+        self.w.keyPressEvent = self.key_press_event
         self.exec_()
 
     def switch_focus(self, focus):
@@ -824,6 +830,21 @@ class FtcGuiApplication(TouchApplication):
             mouse_pos = self.w.category_w.pos()
             click = QMouseEvent(QEvent.MouseButtonPress, mouse_pos, Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
             self.w.category_w.mousePressEvent(click)
+
+    def key_press_event(self, event):
+        button = ''
+        if event.key() == Qt.Key_Up:
+            button = 'up'
+        elif event.key() == Qt.Key_Down:
+            button = 'down'
+        elif event.key() == Qt.Key_Right:
+            button = 'right'
+        elif event.key() == Qt.Key_Left:
+            button = 'left'
+        elif event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter:
+            self.icons.current_icon[-1].click()
+
+        self.icons.change_selected_app(button)
 
     def handle_xbox_button(self, button):
         if not self.app_is_running():
@@ -866,10 +887,10 @@ class FtcGuiApplication(TouchApplication):
                     pyautogui.press('space')
 
     def app_is_running(self):
-        if self.app_process == None:
+        if self.app_process is None:
             return False
 
-        return self.app_process.poll() == None
+        return self.app_process.poll() is None
 
     # this signal is received when an app reports it
     # has been launched

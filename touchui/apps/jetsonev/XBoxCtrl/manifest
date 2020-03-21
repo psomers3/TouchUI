@@ -1,0 +1,9 @@
+[app]
+name: XBoxCtrl
+category: System
+author: Peter Somers &tl;psomers3@gatech.edu&gt;
+icon: icon.png
+desc: Launch normal GUI
+exec: XBoxCtrl.py
+managed: no
+uuid:

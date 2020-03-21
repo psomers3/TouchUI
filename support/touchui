@@ -1,4 +1,6 @@
 #!/bin/bash
-export PYTHONPATH=/root/touchui
+# export PYTHONPATH=/root/touchui
+export PYTHONPATH=/home/isys/git/TouchUI/touchui
 export FRAMEBUFFER=/dev/fb1
-startx /root/touchui/launcher.py
+# startx /root/touchui/launcher.py
+startx /home/isys/git/TouchUI/touchui/launcher.py

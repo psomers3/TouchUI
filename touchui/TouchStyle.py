@@ -73,6 +73,19 @@ else:
         WIN_HEIGHT = height
 
 
+def notify_launcher(msg):
+    # send a signal so launcher knows that the app
+    # is up and can stop the busy animation
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        # Connect to server and send data
+        sock.connect(("localhost", 9000))
+        sock.sendall(bytes("msg {}\n".format(msg), "UTF-8"))
+    except socket.error as msg:
+        print(("Unable to connect to launcher:", msg))
+    finally:
+        sock.close()
+
 
 # background thread to monitor power button event device
 class ButtonThread(QThread):
