@@ -5,6 +5,36 @@ import sys
 from TouchStyle import *
 from PyQt4.Qt import QGridLayout
 from CommonButtons import ShadowButton
+from xbox360controller import Xbox360Controller
+from IMUWidget import IMUWidget
+from VideoWidget import VideoWidget
+from LidarWidget import LidarWidget
+
+
+class XBoxInput(QObject):
+    cycle_right = pyqtSignal(object)
+    cycle_left = pyqtSignal(object)
+
+    def __init__(self):
+        QObject.__init__(self)
+        try:
+            self.xbox_controller = self._connect_controller()
+        except:
+            self.xbox_controller = None
+
+    def _connect_controller(self):
+        try:
+            xbox_controller = Xbox360Controller(index=1, axis_threshold=0.05)
+        except Exception as e:  # this library emits a stupid general exception that makes it difficult to retry
+            try:
+                xbox_controller = Xbox360Controller(index=2, axis_threshold=0.05)
+            except Exception as e:
+                xbox_controller = Xbox360Controller(index=0, axis_threshold=0.05)
+
+        xbox_controller.button_trigger_r.when_pressed = lambda axis: self.cycle_right.emit(axis)
+        xbox_controller.button_trigger_l.when_pressed = lambda axis: self.cycle_left.emit(axis)
+
+        return xbox_controller
 
 
 class FtcGuiApplication(TouchApplication):
@@ -17,6 +47,7 @@ class FtcGuiApplication(TouchApplication):
         self.relative_path = os.path.dirname(os.path.realpath(__file__))
         self.script = os.path.join(self.relative_path, 'Run_car.py')
         self.grid = QGridLayout()
+        self.grid.setSpacing(0)
         self.process = QProcess()
         self.process.readyReadStandardOutput.connect(self.stdoutReady)
         self.process.readyReadStandardError.connect(self.stderrReady)
@@ -77,20 +108,68 @@ class FtcGuiApplication(TouchApplication):
         self.lidar_box.keyReleaseEvent = lambda event: self.filter_out_arrow_release_keys(self.lidar_box, event)
         self.lidar_box.keyPressEvent = lambda event: self.filter_out_arrow_press_keys(self.lidar_box, event)
 
+        self.xbox_controller = XBoxInput()
+        self.xbox_controller.cycle_right.connect(self.cycle_right)
+        self.xbox_controller.cycle_left.connect(self.cycle_left)
+
+        self.imu_widget = IMUWidget()
+        self.grid.addWidget(self.imu_widget, 1, 0, 1, 5)
+        self.imu_widget.hide()
+
+        self.camera_widget = VideoWidget()
+        self.grid.addWidget(self.camera_widget, 1, 0, 1, 5)
+        self.camera_widget.hide()
+
+        self.lidar_widget = LidarWidget()
+        self.grid.addWidget(self.lidar_widget, 1, 0, 1, 5)
+        self.lidar_widget.hide()
+
+        self.widgets_to_show = []
+        self.show_widget_index = 0
         self.w.show()
+        self.aboutToQuit.connect(self.xbox_controller.xbox_controller.close)
         self.exec_()
- 
+
+    def cycle_right(self, axis):
+        last_index = self.show_widget_index
+        self.show_widget_index += 1
+        if self.show_widget_index >= len(self.widgets_to_show):
+            self.show_widget_index = 0
+        self.widgets_to_show[last_index].hide()
+        self.widgets_to_show[self.show_widget_index].show()
+
+    def cycle_left(self, axis):
+        last_index = self.show_widget_index
+        self.show_widget_index -= 1
+        if self.show_widget_index < 0:
+            self.show_widget_index = len(self.widgets_to_show) - 1
+        self.widgets_to_show[last_index].hide()
+        self.widgets_to_show[self.show_widget_index].show()
+
     def start_script(self):
+        self.widgets_to_show = [self.console_output]
         flags = ['-u', self.script]
         if self.imu_box.isChecked():
+            print('starting imu socket')
+            self.imu_widget.connect(port=9009)
+            self.widgets_to_show.append(self.imu_widget)
             flags.extend(['--enable-imu'])
         if self.lidar_box.isChecked():
+            print('starting lidar socket')
+            self.lidar_widget.connect(port=9010)
+            self.widgets_to_show.append(self.lidar_widget)
             flags.extend(['--enable-lidar'])
         if self.camera_box.isChecked():
+            print('starting camera socket')
+            self.camera_widget.connect(port=9011)
+            self.widgets_to_show.append(self.camera_widget)
             flags.extend(['--enable-camera'])
         self.process.start('python3', flags)
 
     def stop_script(self):
+        self.imu_widget.shutdown()
+        self.camera_widget.shutdown()
+        self.lidar_widget.shutdown()
         self.process.terminate()
 
     def fwd_output(self, text):
