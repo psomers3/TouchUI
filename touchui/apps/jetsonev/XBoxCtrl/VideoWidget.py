@@ -33,7 +33,7 @@ class VideoWidget(QWidget):
         self.connected = False
 
     def update_image(self, data):
-        image = data[0]
+        image = data[0]['data']
         assert (np.max(image) <= 255)
         image8 = image.astype(np.uint8, order='C', casting='unsafe')
         height, width, colors = image8.shape

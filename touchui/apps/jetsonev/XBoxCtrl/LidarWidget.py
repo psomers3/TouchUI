@@ -2,6 +2,7 @@ from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 from QNumpySocket import NumpySocket
 from plotTypes import ScatterPlot
+import numpy as np
 
 
 class LidarWidget(QWidget):
@@ -20,7 +21,7 @@ class LidarWidget(QWidget):
         self.socket_thread = QThread()
         self.socket.moveToThread(self.socket_thread)
         self.socket_thread.started.connect(self.socket.recieve_data)
-        self.socket.new_data.connect(self.plot.queue_new_values)
+        self.socket.new_data.connect(self.recieve_data)
         self.socket_thread.start()
         self.connected = True
 
@@ -30,3 +31,8 @@ class LidarWidget(QWidget):
         except:
             pass
         self.connected = False
+
+    def recieve_data(self, new_data):
+        data = new_data[0]['data']
+        self.plot.x_data = np.multiply(np.cos(np.deg2rad(data[:, 0])), data[:, 1])
+        self.plot.y_data = np.multiply(np.sin(np.deg2rad(data[:, 0])), data[:, 1])

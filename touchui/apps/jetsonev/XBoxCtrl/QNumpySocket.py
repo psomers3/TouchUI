@@ -1,5 +1,4 @@
-from PyQt4.QtCore import *
-from PyQt4.QtGui import *
+from PyQt4.QtCore import pyqtSignal,  QObject
 import socket
 import numpy as np
 from io import BytesIO
@@ -64,7 +63,7 @@ class NumpySocket(QObject):
             as_file = BytesIO(buf)
             as_file.seek(0)
             try:
-                self.new_data.emit((np.load(as_file)['data'], time.time()))
+                self.new_data.emit((np.load(as_file), time.time()))
             except:
                 pass
 

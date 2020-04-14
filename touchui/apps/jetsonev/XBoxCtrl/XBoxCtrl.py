@@ -9,6 +9,7 @@ from xbox360controller import Xbox360Controller
 from IMUWidget import IMUWidget
 from VideoWidget import VideoWidget
 from LidarWidget import LidarWidget
+from SpeedWidget import SpeedWidget
 
 
 class XBoxInput(QObject):
@@ -112,6 +113,10 @@ class FtcGuiApplication(TouchApplication):
         self.xbox_controller.cycle_right.connect(self.cycle_right)
         self.xbox_controller.cycle_left.connect(self.cycle_left)
 
+        self.speed_widget = SpeedWidget()
+        self.grid.addWidget(self.speed_widget, 1, 0, 1, 5)
+        self.speed_widget.hide()
+
         self.imu_widget = IMUWidget()
         self.grid.addWidget(self.imu_widget, 1, 0, 1, 5)
         self.imu_widget.hide()
@@ -147,8 +152,10 @@ class FtcGuiApplication(TouchApplication):
         self.widgets_to_show[self.show_widget_index].show()
 
     def start_script(self):
-        self.widgets_to_show = [self.console_output]
+        self.widgets_to_show = [self.console_output, self.speed_widget]
         flags = ['-u', self.script]
+        self.speed_widget.connect(port=4021)
+
         if self.imu_box.isChecked():
             print('starting imu socket')
             self.imu_widget.connect(port=9009)
@@ -170,6 +177,7 @@ class FtcGuiApplication(TouchApplication):
         self.imu_widget.shutdown()
         self.camera_widget.shutdown()
         self.lidar_widget.shutdown()
+        self.speed_widget.shutdown()
         self.process.terminate()
 
     def fwd_output(self, text):

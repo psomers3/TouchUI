@@ -45,6 +45,9 @@ class IMUWidget(QWidget):
         self.connected = False
 
     def disperse_values(self, new_values):
-        self.accel.queue_new_values((new_values[0][0], new_values[1]))
-        self.gyro.queue_new_values((new_values[0][1], new_values[1]))
-        # self.mag.queue_new_values((new_values[0][2], new_values[1]))
+        accel_data = {'data': new_values[0]['accel']}
+        gyro_data = {'data': new_values[0]['gyro']}
+        # mag_data = {'data': new_values[0]['mag']}
+        self.accel.queue_new_values((accel_data, new_values[1]))
+        self.gyro.queue_new_values((gyro_data, new_values[1]))
+        # self.mag.queue_new_values((mag_data, new_values[1]))

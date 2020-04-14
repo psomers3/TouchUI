@@ -1,4 +1,5 @@
-from JetsonEV import JetsonEV, NumpySocket
+from JetsonEV import JetsonEV
+from NumpySocket import NumpySocket
 import time
 from argparse import ArgumentParser
 
@@ -15,39 +16,57 @@ if __name__ == '__main__':
     lidar = args.enable_lidar
 
     # initialize car
-    car = JetsonEV(mode='xbox', initialize_camera=camera, initialize_lidar=lidar, max_speed_limit=0.30)
+    car = JetsonEV(mode=JetsonEV.xbox_direct_mode,
+                   initialize_imu=imu,
+                   initialize_camera=camera,
+                   initialize_lidar=lidar,
+                   max_speed_limit=1,
+                   max_duty_cycle=0.15,
+                   rc_communication=1,
+                   rc_control=JetsonEV.ARDUINO_CONTROL)
+
+    speed_socket = NumpySocket(tcp_port=4021)
+    speed_old_fwd_func = car.motor_encoder.forwarding_function
+
+    def speed_forwarding_function(values):
+        speed_old_fwd_func(values)
+        speed_socket.send_data(car.speed)
+
+    car.motor_encoder.forwarding_function = speed_forwarding_function
+    car._output_sockets.append(speed_socket)
+    speed_socket.thread.start()
 
     # add sockets for touch app for requested car features
     if imu:
         imu_socket = NumpySocket(tcp_port=9009)
 
-        def new_forwarding_function(values):
-            imu_socket.send_data(values)
-        car.imu.forwarding_function = new_forwarding_function
+        def imu_new_forwarding_function(values):
+            imu_socket.send_data({'accel': values[0], 'gyro': values[1]})
+        car.imu.forwarding_function = imu_new_forwarding_function
         car._output_sockets.append(imu_socket)
         imu_socket.thread.start()
 
     if camera:
         print('making camera socket')
         camera_socket = NumpySocket(tcp_port=9011)
-        old_fwd_func = car.camera.forwarding_function
+        cam_old_fwd_func = car.camera.forwarding_function
 
-        def new_forwarding_function(values):
-            old_fwd_func(values)
+        def cam_new_forwarding_function(values):
+            cam_old_fwd_func(values)
             camera_socket.send_data(values)
-        car.camera.forwarding_function = new_forwarding_function
+        car.camera.forwarding_function = cam_new_forwarding_function
         car._output_sockets.append(camera_socket)
         camera_socket.thread.start()
 
     if lidar:
         lidar_socket = NumpySocket(tcp_port=9010)
-        old_fwd_func = car.lidar.forwarding_function
+        lidar_old_fwd_func = car.lidar.forwarding_function
 
-        def new_forwarding_function(values):
-            old_fwd_func(values)
+        def lidar_new_forwarding_function(values):
+            lidar_old_fwd_func(values)
             lidar_socket.send_data(values)
 
-        car.lidar.forwarding_function = new_forwarding_function
+        car.lidar.forwarding_function = lidar_new_forwarding_function
         car._output_sockets.append(lidar_socket)
         lidar_socket.thread.start()
 
