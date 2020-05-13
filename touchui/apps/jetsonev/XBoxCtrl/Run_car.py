@@ -1,5 +1,5 @@
 from JetsonEV import JetsonEV
-from NumpySocket import NumpySocket
+from DataSocket import SendSocket
 import time
 from argparse import ArgumentParser
 
@@ -25,7 +25,7 @@ if __name__ == '__main__':
                    rc_communication=1,
                    rc_control=JetsonEV.ARDUINO_CONTROL)
 
-    speed_socket = NumpySocket(tcp_port=4021)
+    speed_socket = SendSocket(tcp_port=4021)
     speed_old_fwd_func = car.motor_encoder.forwarding_function
 
     def speed_forwarding_function(values):
@@ -38,7 +38,7 @@ if __name__ == '__main__':
 
     # add sockets for touch app for requested car features
     if imu:
-        imu_socket = NumpySocket(tcp_port=9009)
+        imu_socket = SendSocket(tcp_port=9009)
 
         def imu_new_forwarding_function(values):
             imu_socket.send_data({'accel': values[0], 'gyro': values[1]})
@@ -48,7 +48,7 @@ if __name__ == '__main__':
 
     if camera:
         print('making camera socket')
-        camera_socket = NumpySocket(tcp_port=9011)
+        camera_socket = SendSocket(tcp_port=9011)
         cam_old_fwd_func = car.camera.forwarding_function
 
         def cam_new_forwarding_function(values):
@@ -59,7 +59,7 @@ if __name__ == '__main__':
         camera_socket.thread.start()
 
     if lidar:
-        lidar_socket = NumpySocket(tcp_port=9010)
+        lidar_socket = SendSocket(tcp_port=9010)
         lidar_old_fwd_func = car.lidar.forwarding_function
 
         def lidar_new_forwarding_function(values):

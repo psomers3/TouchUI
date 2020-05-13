@@ -154,21 +154,21 @@ class FtcGuiApplication(TouchApplication):
     def start_script(self):
         self.widgets_to_show = [self.console_output, self.speed_widget]
         flags = ['-u', self.script]
-        self.speed_widget.connect(port=4021)
+        self.speed_widget.start(port=4021)
 
         if self.imu_box.isChecked():
             print('starting imu socket')
-            self.imu_widget.connect(port=9009)
+            self.imu_widget.start(port=9009)
             self.widgets_to_show.append(self.imu_widget)
             flags.extend(['--enable-imu'])
         if self.lidar_box.isChecked():
             print('starting lidar socket')
-            self.lidar_widget.connect(port=9010)
+            self.lidar_widget.start(port=9010)
             self.widgets_to_show.append(self.lidar_widget)
             flags.extend(['--enable-lidar'])
         if self.camera_box.isChecked():
             print('starting camera socket')
-            self.camera_widget.connect(port=9011)
+            self.camera_widget.start(port=9011)
             self.widgets_to_show.append(self.camera_widget)
             flags.extend(['--enable-camera'])
         self.process.start('python3', flags)
